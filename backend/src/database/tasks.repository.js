@@ -1,6 +1,7 @@
 'use strict';
 const pool = require('./connection');
 const { NotFoundError, ForbiddenError, AppError } = require('../utils/errors');
+const { requireTaskPermission, requireProjectAssignees, requireProjectAccess } = require('./projectAccess');
 
 const OVERALL_STATUS_SQL = `(
   SELECT CASE
@@ -78,6 +79,7 @@ async function createTask({ title, description, priority, due_date, created_by, 
   const dbClient = await pool.connect();
   try {
     await dbClient.query('BEGIN');
+    await requireProjectAssignees(project_id, effectiveAssigneeIds, dbClient);
     const userIdsToLock = [...new Set([...effectiveAssigneeIds, created_by].map(String))];
     const { rows: lockedUsers } = await dbClient.query(
       `SELECT id, is_active
@@ -306,11 +308,12 @@ async function updateTaskStatus(taskId, user, targetStatus) {
   try {
     await client.query('BEGIN');
     const { rows: taskRows } = await client.query(
-      'SELECT id, created_by FROM tasks WHERE id = $1 AND deleted_at IS NULL FOR UPDATE',
+      'SELECT id, created_by, project_id FROM tasks WHERE id = $1 AND deleted_at IS NULL FOR UPDATE',
       [taskId]
     );
     if (taskRows.length === 0) throw new NotFoundError('Task not found');
     const task = taskRows[0];
+    const { isLead } = await requireTaskPermission(taskId, user, 'can_update_status', client);
 
     const { rows: activeAssignments } = await client.query(
       `SELECT * FROM task_assignments WHERE task_id = $1 AND assignment_status = 'active'`,
@@ -321,7 +324,8 @@ async function updateTaskStatus(taskId, user, targetStatus) {
     const isCreator = String(task.created_by) === String(user.id);
     const isAdmin = user.role === 'admin';
 
-    if (!isAdmin && !isAssignee && !isCreator) {
+    const canManage = isAdmin || isLead || (!task.project_id && isCreator);
+    if (!canManage && !isAssignee) {
       throw new ForbiddenError('You do not have permission to change the status of this task');
     }
 
@@ -339,11 +343,11 @@ async function updateTaskStatus(taskId, user, targetStatus) {
         [newAssign[0].id, user.id, targetStatus]
       );
     } else {
-      const assignmentsToUpdate = isAdmin
+      const assignmentsToUpdate = canManage
         ? activeAssignments
         : activeAssignments.filter(a => String(a.user_id) === String(user.id));
 
-      const list = assignmentsToUpdate.length > 0 ? assignmentsToUpdate : activeAssignments;
+      const list = assignmentsToUpdate;
       for (const a of list) {
         if (a.status !== targetStatus) {
           const completedAt = targetStatus === 'completed' ? 'NOW()' : 'NULL';
@@ -373,6 +377,7 @@ async function updateTaskStatus(taskId, user, targetStatus) {
 }
 
 async function getTaskStats(user, projectId = null) {
+  if (projectId) await requireProjectAccess(projectId, user);
   const conditions = ['t.deleted_at IS NULL'];
   const params = [];
   let i = 1;

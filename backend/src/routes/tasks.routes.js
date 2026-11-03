@@ -19,7 +19,7 @@ router.use(authenticate);
 
 router.post('/', createTaskValidation, validate, tasksController.createTask);
 router.get('/', taskQueryValidation, validate, tasksController.getTasks);
-router.get('/stats', tasksController.getTaskStats);
+router.get('/stats', query('project_id').optional().isInt({ min: 1 }), validate, tasksController.getTaskStats);
 router.get('/:id', param('id').isInt({ min: 1 }).withMessage('Task id must be a positive integer'), validate, tasksController.getTaskById);
 router.patch('/:id', param('id').isInt({ min: 1 }), updateTaskValidation, validate, tasksController.updateTask);
 router.patch('/:id/status', taskIdValidation, tasksController.updateTaskStatus);

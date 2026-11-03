@@ -14,6 +14,8 @@
 
 ## 🌟 Tính năng nổi bật
 
+**Không gian Leader:** menu **Quản lý dự án** cung cấp tiến độ toàn dự án, khối lượng theo thành viên, giao việc nhanh và hai quyền thành viên có lịch sử thay đổi. Xem [hướng dẫn sử dụng và chạy migration 013](docs/leader-workspace.md).
+
 ### 1. Quản lý Đa dự án & Phân quyền Dự án (Project Governance)
 - **Tạo & Quản lý Dự án**: Người dùng có thể tạo dự án với tên và mã định danh riêng (Project Key: ví dụ `TF`, `PRJ`).
 - **Mã công việc chuẩn Jira**: Tự động sinh mã công việc dạng `TF-1`, `TF-23` cho từng dự án.

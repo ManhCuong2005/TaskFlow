@@ -5,6 +5,7 @@ const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const validate = require('../middlewares/validate');
 const projectsController = require('../controllers/projects.controller');
+const leaderController = require('../controllers/leader.controller');
 
 const router = express.Router();
 
@@ -30,6 +31,14 @@ router.post(
   projectsController.createProject
 );
 
+router.get('/:id/leader', param('id').isInt({ min: 1 }), validate, leaderController.getOverview);
+router.patch('/:id/members/:userId/permissions', [
+  param('id').isInt({ min: 1 }),
+  param('userId').isInt({ min: 1 }),
+  body('can_update_status').custom(value => typeof value === 'boolean').withMessage('can_update_status must be boolean'),
+  body('can_comment').custom(value => typeof value === 'boolean').withMessage('can_comment must be boolean'),
+  body('expected_version').custom(value => Number.isInteger(value) && value >= 0).withMessage('expected_version must be a non-negative integer'),
+], validate, leaderController.updatePermissions);
 router.get('/:id', param('id').isInt({ min: 1 }), validate, projectsController.getProjectById);
 router.post(
   '/:id/members',

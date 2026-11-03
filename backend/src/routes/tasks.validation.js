@@ -6,7 +6,8 @@ const createTaskValidation = [
   body('title').trim().notEmpty().withMessage('Title is required').isLength({ max: 200 }),
   body('description').optional().isString(),
   body('priority').optional().isIn(['low', 'medium', 'high']).withMessage('Priority must be low, medium, or high'),
-  body('due_date').optional().isISO8601().withMessage('due_date must be a valid ISO 8601 date'),
+  body('due_date').optional({ nullable: true }).isISO8601().withMessage('due_date must be a valid ISO 8601 date'),
+  body('project_id').optional({ nullable: true }).isInt({ min: 1 }).withMessage('project_id must be a positive integer'),
   body('assignee_ids').optional().isArray().withMessage('assignee_ids must be an array'),
   body('assignee_ids.*').optional().isInt({ min: 1 }).withMessage('Each assignee_id must be a positive integer'),
 ];
@@ -19,6 +20,7 @@ const updateTaskValidation = [
 ];
 
 const taskQueryValidation = [
+  query('project_id').optional().isInt({ min: 1 }),
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('search').optional().isString().isLength({ max: 200 }),

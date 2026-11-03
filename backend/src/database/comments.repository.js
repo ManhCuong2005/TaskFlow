@@ -2,6 +2,7 @@
 const pool = require('./connection');
 const { NotFoundError, ForbiddenError } = require('../utils/errors');
 const { canAccessTask } = require('./tasks.repository');
+const { requireTaskPermission } = require('./projectAccess');
 
 async function getComments(taskId, user, { page = 1, limit = 50 } = {}) {
   const access = await canAccessTask(taskId, user);
@@ -36,20 +37,7 @@ async function lockTaskAccess(taskId, user, client) {
 
   if (user.role === 'admin') return;
 
-  const { rows: assignments } = await client.query(
-    `SELECT id
-     FROM task_assignments
-     WHERE task_id = $1 AND user_id = $2 AND assignment_status = 'active'
-     FOR SHARE`,
-    [taskId, user.id]
-  );
-  if (assignments.length === 0) {
-    const { rows: creators } = await client.query(
-      'SELECT id FROM tasks WHERE id = $1 AND created_by = $2',
-      [taskId, user.id]
-    );
-    if (creators.length === 0) throw new ForbiddenError('Access denied');
-  }
+  if (!await canAccessTask(taskId, user, client)) throw new ForbiddenError('Access denied');
 }
 
 async function addComment(taskId, user_id, content, user) {
@@ -57,6 +45,7 @@ async function addComment(taskId, user_id, content, user) {
   try {
     await client.query('BEGIN');
     await lockTaskAccess(taskId, user, client);
+    await requireTaskPermission(taskId, user, 'can_comment', client);
     const { rows } = await client.query(
       `INSERT INTO task_comments (task_id, user_id, content)
        VALUES ($1, $2, $3)
@@ -78,6 +67,7 @@ async function updateComment(taskId, commentId, content, user) {
   try {
     await client.query('BEGIN');
     await lockTaskAccess(taskId, user, client);
+    await requireTaskPermission(taskId, user, 'can_comment', client);
 
     const { rows } = await client.query(
       `SELECT *

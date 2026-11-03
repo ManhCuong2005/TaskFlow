@@ -56,6 +56,7 @@ export default function Navbar({
     admin_infra: 'Cloud Infrastructure Specs',
     // Employee tabs
     dashboard: 'Dashboard & Analytics',
+    leader: 'Quản lý dự án',
     board: 'Kanban Board',
     tasks: 'All Issues',
     team: 'Project Members',
@@ -90,10 +91,14 @@ export default function Navbar({
   };
 
   return (
-    <header className="h-16 border-b border-slate-200/80 bg-white/95 backdrop-blur-sm px-6 flex items-center justify-between gap-4 sticky top-0 z-10">
+    <header className="h-16 shrink-0 border-b border-slate-200/80 bg-white/95 backdrop-blur-sm px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 sticky top-0 z-10">
       {/* Left: Breadcrumbs & Page Title */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+      <div className="min-w-0 flex-1 lg:flex-none">
+        <div className="lg:hidden">
+          <p className="truncate text-sm font-bold text-slate-900">{titles[activeTab] || 'TaskFlow'}</p>
+          <p className="mt-0.5 truncate text-[11px] text-slate-400">{isAdmin ? 'System Administration' : currentProject?.name || 'Workspace'}</p>
+        </div>
+        <div className="hidden lg:flex items-center gap-2 text-sm text-slate-500 font-medium">
           {isAdmin ? (
             <>
               <span className="flex items-center gap-1 text-purple-700 font-bold">
@@ -129,7 +134,7 @@ export default function Navbar({
 
       {/* Middle: Universal Search Bar (only in task/board views) */}
       {!isAdmin && (activeTab === 'board' || activeTab === 'tasks') && (
-        <div className="flex-1 max-w-md hidden md:flex items-center gap-2">
+        <div className="flex-1 max-w-md hidden xl:flex items-center gap-2">
           <div className="relative w-full">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -157,7 +162,7 @@ export default function Navbar({
       )}
 
       {/* Right Actions */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2.5">
         <button
           onClick={onRefresh}
           disabled={refreshing}
@@ -293,7 +298,7 @@ export default function Navbar({
             {isProjectLead && (
               <button
                 onClick={onOpenCreateModal}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium shadow-xs transition-all hover:shadow-md hover:shadow-blue-500/20 active:scale-95 cursor-pointer"
+                className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium shadow-xs transition-all hover:shadow-md hover:shadow-blue-500/20 active:scale-95 cursor-pointer"
                 title="Tạo Issue mới (Project Lead)"
               >
                 <Plus className="w-4 h-4" />

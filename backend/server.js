@@ -2,6 +2,7 @@ require("dotenv").config(); // Load environment variables from .env file
 const app = require("./src/app.js"); // Import the Express app
 const db = require("./src/database/connection");
 const logger = require("./src/utils/logger");
+const listen = require("./src/utils/listen");
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
@@ -17,9 +18,8 @@ async function startServer() {
     }
 
     await db.query("SELECT 1");
-    const server = app.listen(PORT, () => {
-        logger.info("API server started", { port: PORT });
-    });
+    const server = await listen(app, PORT);
+    logger.info("API server started", { port: PORT });
 
     let isShuttingDown = false;
     const shutdown = (signal) => {

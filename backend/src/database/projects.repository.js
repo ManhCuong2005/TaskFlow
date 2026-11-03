@@ -1,6 +1,7 @@
 'use strict';
 const pool = require('./connection');
 const { AppError, NotFoundError, ForbiddenError, ConflictError } = require('../utils/errors');
+const { requireProjectLead } = require('./projectAccess');
 
 async function getProjects(user) {
   let query;
@@ -66,7 +67,9 @@ async function getProjectById(projectId, user) {
 
   // Fetch members
   const { rows: members } = await pool.query(
-    `SELECT u.id, u.full_name, u.email, u.role AS system_role, pm.role AS project_role, pm.joined_at
+    `SELECT u.id, u.full_name, u.email, u.is_active, u.role AS system_role, pm.role AS project_role, pm.joined_at,
+       COALESCE((to_jsonb(pm)->>'can_update_status')::boolean, TRUE) AS can_update_status,
+       COALESCE((to_jsonb(pm)->>'can_comment')::boolean, TRUE) AS can_comment
      FROM project_members pm
      JOIN users u ON u.id = pm.user_id
      WHERE pm.project_id = $1
@@ -227,6 +230,7 @@ async function inviteProjectMember(projectId, inviteeId, inviterUser) {
 }
 
 async function getProjectPendingInvitations(projectId, user) {
+  await requireProjectLead(projectId, user);
   const { rows } = await pool.query(
     `SELECT pi.id, pi.project_id, pi.status, pi.created_at,
             u.id AS invitee_id, u.full_name AS invitee_name, u.email AS invitee_email,

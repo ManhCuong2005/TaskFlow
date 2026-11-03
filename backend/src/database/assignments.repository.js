@@ -2,6 +2,7 @@
 const pool = require('./connection');
 const { NotFoundError, ForbiddenError, ConflictError, AppError } = require('../utils/errors');
 const { canAccessTask } = require('./tasks.repository');
+const { requireTaskPermission, requireProjectAssignees } = require('./projectAccess');
 
 async function getAssignments(taskId, user) {
   const access = await canAccessTask(taskId, user);
@@ -26,7 +27,7 @@ async function getAssignments(taskId, user) {
 
 async function assignUsers(taskId, assignee_ids, assigned_by, user) {
   const { rows: taskLeadRows } = await pool.query(
-    `SELECT t.created_by, p.lead_id
+    `SELECT t.created_by, t.project_id, p.lead_id
      FROM tasks t
      LEFT JOIN projects p ON p.id = t.project_id
      WHERE t.id = $1 AND t.deleted_at IS NULL`,
@@ -36,7 +37,7 @@ async function assignUsers(taskId, assignee_ids, assigned_by, user) {
   const task = taskLeadRows[0];
   const canAssign = user.role === 'admin'
     || String(task.lead_id) === String(user.id)
-    || String(task.created_by) === String(user.id);
+    || (!task.project_id && String(task.created_by) === String(user.id));
   if (!canAssign) throw new ForbiddenError('Only the Project Lead, Task Creator, or Admin can assign members');
 
   if (!Array.isArray(assignee_ids) || assignee_ids.length === 0) {
@@ -46,6 +47,7 @@ async function assignUsers(taskId, assignee_ids, assigned_by, user) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await requireProjectAssignees(task.project_id, assignee_ids, client);
 
     const { rows: taskRows } = await client.query(
       'SELECT id FROM tasks WHERE id = $1 AND deleted_at IS NULL FOR SHARE',
@@ -109,7 +111,7 @@ async function assignUsers(taskId, assignee_ids, assigned_by, user) {
 
 async function revokeAssignment(taskId, assignmentId, revoked_by, revoke_reason, user) {
   const { rows: taskLeadRows } = await pool.query(
-    `SELECT t.created_by, p.lead_id
+    `SELECT t.created_by, t.project_id, p.lead_id
      FROM tasks t
      LEFT JOIN projects p ON p.id = t.project_id
      WHERE t.id = $1 AND t.deleted_at IS NULL`,
@@ -119,7 +121,7 @@ async function revokeAssignment(taskId, assignmentId, revoked_by, revoke_reason,
   const task = taskLeadRows[0];
   const canRevoke = user.role === 'admin'
     || String(task.lead_id) === String(user.id)
-    || String(task.created_by) === String(user.id);
+    || (!task.project_id && String(task.created_by) === String(user.id));
   if (!canRevoke) throw new ForbiddenError('Only the Project Lead, Task Creator, or Admin can revoke assignments');
 
   const client = await pool.connect();
@@ -179,7 +181,8 @@ async function updateAssignmentStatus(taskId, assignmentId, newStatus, changed_b
     if (assignRows.length === 0) throw new NotFoundError('Active assignment not found');
 
     const assignment = assignRows[0];
-    if (user.role === 'employee' && String(assignment.user_id) !== String(user.id)) {
+    const { isLead } = await requireTaskPermission(taskId, user, 'can_update_status', client);
+    if (user.role === 'employee' && !isLead && String(assignment.user_id) !== String(user.id)) {
       throw new ForbiddenError('You can only update your own assignments');
     }
     if (assignment.status === newStatus) {

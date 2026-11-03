@@ -51,6 +51,7 @@ export default function Sidebar({
   ];
 
   const employeeNavItems = [
+    ...(isProjectLead ? [{ id: 'leader', label: 'Quản lý dự án', icon: Crown }] : []),
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'board', label: 'Kanban Board', icon: Kanban },
     { id: 'tasks', label: 'All Tasks', icon: ListTodo },

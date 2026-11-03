@@ -16,6 +16,7 @@ import ProfileView from '../features/profile/ProfileView';
 import AuthView from '../features/auth/AuthView';
 import AccountSettingsModal from '../features/profile/AccountSettingsModal';
 import InviteMemberModal from '../features/team/InviteMemberModal';
+import LeaderWorkspace from '../features/leader/LeaderWorkspace';
 import { FolderPlus } from 'lucide-react';
 
 const STORAGE_KEY_TOKEN = 'taskflow_token';
@@ -54,7 +55,7 @@ export default function WorkspaceController() {
     }
   });
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 1024);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOnlyMine, setFilterOnlyMine] = useState(false);
   const [toast, setToast] = useState(null);
@@ -62,6 +63,7 @@ export default function WorkspaceController() {
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [initialAssigneeId, setInitialAssigneeId] = useState(null);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -283,6 +285,8 @@ export default function WorkspaceController() {
         const { response, data } = await requestJson(`/api/projects/${currentProject.id}`, { token });
         if (response.ok && data?.data?.members) {
           setTeamMembers(data.data.members);
+          setCurrentProject(prev => prev && String(prev.id) === String(data.data.id)
+            ? { ...prev, members: data.data.members } : prev);
         }
       } else {
         setTeamMembers([]);
@@ -308,7 +312,8 @@ export default function WorkspaceController() {
 
   // Fetch invitations sent for current project
   const fetchProjectInvitations = useCallback(async () => {
-    if (!token || !currentProject?.id || currentUser?.role === 'admin') return;
+    if (!token || !currentProject?.id || currentUser?.role === 'admin'
+      || String(currentProject.lead_id) !== String(currentUser?.id)) return;
     try {
       const { response, data } = await requestJson(`/api/projects/${currentProject.id}/invitations`, { token });
       if (response.ok && data?.data) {
@@ -317,7 +322,7 @@ export default function WorkspaceController() {
     } catch (err) {
       console.error('Fetch project invitations error:', err);
     }
-  }, [token, currentProject?.id, currentUser?.role]);
+  }, [token, currentProject?.id, currentProject?.lead_id, currentUser?.role, currentUser?.id]);
 
   // Load sub-resources when selectedTask changes
   const loadTaskDetails = useCallback(
@@ -343,6 +348,19 @@ export default function WorkspaceController() {
     },
     [token]
   );
+
+  useEffect(() => {
+    setSelectedTask(null);
+    setIsCreateModalOpen(false);
+    setInitialAssigneeId(null);
+    setIsInviteModalOpen(false);
+  }, [currentProject?.id]);
+
+  useEffect(() => {
+    if (activeTab === 'leader' && String(currentProject?.lead_id) !== String(currentUser?.id)) {
+      setActiveTab('board');
+    }
+  }, [activeTab, currentProject?.lead_id, currentUser?.id]);
 
   // Initial fetch for projects and my invitations on login
   useEffect(() => {
@@ -643,6 +661,7 @@ export default function WorkspaceController() {
       showToast('Member assigned');
       loadTaskDetails({ id: taskId });
       fetchTasks();
+      fetchStats();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -663,6 +682,7 @@ export default function WorkspaceController() {
       showToast('Assignment revoked');
       loadTaskDetails({ id: taskId });
       fetchTasks();
+      fetchStats();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -912,6 +932,27 @@ export default function WorkspaceController() {
           )}
 
           {/* EMPLOYEE WORKSPACE VIEWS (ACTIVE PROJECT) */}
+          {!isAdmin && isProjectLead && currentProject && activeTab === 'leader' && (
+            <LeaderWorkspace
+              key={currentProject.id}
+              project={currentProject}
+              token={token}
+              revision={stats}
+              onInvite={() => setIsInviteModalOpen(true)}
+              onCreateTask={(memberId = null) => {
+                setInitialAssigneeId(memberId);
+                setIsCreateModalOpen(true);
+              }}
+              onSelectTask={async (taskId) => {
+                try {
+                  const { response, data } = await requestJson(`/api/tasks/${taskId}`, { token });
+                  if (!response.ok) throw new Error(data?.message || 'Không thể mở công việc.');
+                  setSelectedTask(data.data);
+                } catch (err) { showToast(err.message, 'error'); }
+              }}
+              onSaved={showToast}
+            />
+          )}
           {!isAdmin && currentProject && activeTab === 'dashboard' && (
             <DashboardView
               stats={stats}
@@ -929,6 +970,10 @@ export default function WorkspaceController() {
           {!isAdmin && currentProject && activeTab === 'board' && (
             <KanbanBoard
               tasks={displayedTasks}
+              canUpdateTask={(task) => isProjectLead || (
+                teamMembers.find(member => String(member.id) === String(currentUser.id))?.can_update_status !== false
+                && task.assignees?.some(member => String(member.id) === String(currentUser.id))
+              )}
               onSelectTask={setSelectedTask}
               onUpdateTaskStatus={handleUpdateTaskStatus}
               onOpenCreateModal={() => setIsCreateModalOpen(true)}
@@ -1013,7 +1058,8 @@ export default function WorkspaceController() {
       {!isAdmin && isProjectLead && (
         <CreateTaskModal
           isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
+          initialAssigneeId={initialAssigneeId}
+          onClose={() => { setIsCreateModalOpen(false); setInitialAssigneeId(null); }}
           onCreateTask={handleCreateTask}
           currentUser={currentUser}
           teamMembers={teamMembers}

@@ -30,6 +30,7 @@ export default function KanbanBoard({
   onDeleteTask,
   loading,
   isProjectLead = false,
+  canUpdateTask = () => true,
 }) {
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
@@ -188,7 +189,7 @@ export default function KanbanBoard({
                     return (
                       <div
                         key={task.id}
-                        draggable
+                        draggable={canUpdateTask(task)}
                         onDragStart={(e) => handleDragStart(e, task.id)}
                         onClick={() => onSelectTask(task)}
                         className={`group relative bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-blue-400/80 cursor-grab active:cursor-grabbing transition-all select-none ${

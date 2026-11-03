@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Sparkles, FolderKanban, CheckSquare, Calendar, UserCheck, Crown, Paperclip, FileText } from 'lucide-react';
 import { fromDateTimeLocalString } from '../../utils/helpers';
 
@@ -9,6 +9,7 @@ export default function CreateTaskModal({
   currentUser,
   teamMembers = [],
   currentProject,
+  initialAssigneeId = null,
 }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -18,6 +19,10 @@ export default function CreateTaskModal({
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) setSelectedAssignees(initialAssigneeId == null ? [] : [initialAssigneeId]);
+  }, [isOpen, initialAssigneeId, currentProject?.id]);
 
   if (!isOpen) return null;
 
@@ -83,12 +88,12 @@ export default function CreateTaskModal({
       />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200/80 z-10 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div role="dialog" aria-modal="true" aria-labelledby="create-task-title" className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200/80 z-10 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-blue-600" />
-            <h2 className="text-base font-bold text-slate-900">Create Issue</h2>
+            <h2 id="create-task-title" className="text-base font-bold text-slate-900">Create Issue</h2>
           </div>
           <button
             onClick={onClose}
@@ -202,7 +207,7 @@ export default function CreateTaskModal({
                 </span>
               </div>
               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-slate-50/70 border border-slate-100 rounded-xl">
-                {teamMembers.map((m) => {
+                {teamMembers.filter((member) => member.is_active !== false).map((m) => {
                   const isSelected = selectedAssignees.includes(m.id);
                   return (
                     <button

@@ -119,6 +119,10 @@ export default function TaskDetailDrawer({
   const canEdit = currentUser?.role === 'admin' || isProjectLead;
   const canDelete = currentUser?.role === 'admin' || isProjectLead;
   const canManageAssignments = currentUser?.role === 'admin' || isProjectLead;
+  const membership = teamMembers.find(member => String(member.id) === String(currentUser?.id));
+  const canComment = canEdit || membership?.can_comment !== false;
+  const isAssignee = assignments.some(assignment => String(assignment.user_id) === String(currentUser?.id));
+  const canUpdateStatus = canEdit || (isAssignee && membership?.can_update_status !== false);
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
@@ -140,6 +144,8 @@ export default function TaskDetailDrawer({
             {/* Quick Status Pill Dropdown */}
             <select
               value={task.overall_status === 'unassigned' ? 'todo' : task.overall_status}
+              disabled={!canUpdateStatus}
+              title={canUpdateStatus ? 'Cập nhật trạng thái' : 'Bạn chưa có quyền cập nhật trạng thái công việc này'}
               onChange={(e) => onUpdateStatus(task.id, e.target.value)}
               className="text-xs font-semibold px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
             >
@@ -353,7 +359,7 @@ export default function TaskDetailDrawer({
                 >
                   <option value="">+ Assign member to this task...</option>
                   {teamMembers
-                    .filter((m) => !assignments.some((a) => String(a.user_id) === String(m.id)))
+                    .filter((m) => m.is_active !== false && !assignments.some((a) => String(a.user_id) === String(m.id)))
                     .map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.full_name} ({m.email})
@@ -416,7 +422,7 @@ export default function TaskDetailDrawer({
             {activeTab === 'comments' && (
               <div className="space-y-4">
                 {/* Comment input box */}
-                <form onSubmit={handleAddCommentSubmit} className="space-y-2">
+                {canComment ? <form onSubmit={handleAddCommentSubmit} className="space-y-2">
                   <textarea
                     rows={2}
                     value={commentText}
@@ -433,7 +439,7 @@ export default function TaskDetailDrawer({
                       Save comment
                     </button>
                   </div>
-                </form>
+                </form> : <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-500">Leader chưa cấp quyền viết bình luận trong dự án này. Bạn vẫn có thể đọc nội dung trao đổi.</p>}
 
                 {/* Comment list */}
                 <div className="space-y-3 pt-2">
